@@ -32,8 +32,8 @@ services:
       - broker
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=broker:29092
-      - AWS_ACCESS_KEY_ID=AKIARXDLONFBTXTZ5P7W
-      - AWS_SECRET_ACCESS_KEY=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
+      - AWS_ACCESS_KEY_ID=<acceskey>
+      - AWS_SECRET_ACCESS_KEY=<secret-acceskey>
     volumes:
       - ./kafka-s3:/app
 
