@@ -1,18 +1,18 @@
-# main.py
-
 import boto3
-from fastapi import FastAPI
-from confluent_kafka import Producer
+from confluent_kafka import Producer, KafkaException
+from confluent_kafka.admin import AdminClient, NewTopic
 
-app = FastAPI()
-
-kafka_bootstrap_servers = (
-    "localhost:29092"  # Replace with the actual IP address of your Kafka broker
-)
+kafka_bootstrap_servers = "broker:29092"  # Update with the actual IP address of the Kafka broker
 
 
-@app.get("/")
-def get_data():
+def create_topic_if_not_exists(topic, num_partitions=1, replication_factor=1):
+    admin_client = AdminClient({'bootstrap.servers': kafka_bootstrap_servers})
+    topic_list = []
+    topic_list.append(NewTopic(topic, num_partitions=num_partitions, replication_factor=replication_factor))
+    admin_client.create_topics(topic_list)
+
+
+def send_data():
     # Retrieve data from S3
     s3 = boto3.client("s3")
     bucket_name = "muzammilmehmood-gluedata"
@@ -21,18 +21,25 @@ def get_data():
     response = s3.get_object(Bucket=bucket_name, Key=key)
     data = response["Body"].read().decode("utf-8")
 
+    # Create topic if not exists
+    kafka_topic = "my-topic"
+    create_topic_if_not_exists(kafka_topic)
+
     # Stream data through Kafka
     kafka_producer = Producer({"bootstrap.servers": kafka_bootstrap_servers})
-    kafka_topic = "my-new"
+
+    def delivery_callback(err, msg):
+        if err is not None:
+            print(f"Failed to deliver message: {err}")
+        else:
+            print(f"Message delivered to topic {msg.topic()} - partition {msg.partition()}")
 
     # Send data to Kafka
-    kafka_producer.produce(kafka_topic, value=data.encode("utf-8"))
-    kafka_producer.flush()  # Optionally, you can call flush() to ensure all messages are sent
-
-    return {"message": "Data sent to Kafka"}
+    kafka_producer.produce(kafka_topic, value=data.encode("utf-8"), callback=delivery_callback)
+    kafka_producer.flush()
 
 
 if __name__ == "__main__":
-    import uvicorn
+    while True:
+        send_data()
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
